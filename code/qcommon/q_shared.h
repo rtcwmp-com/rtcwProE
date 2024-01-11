@@ -26,17 +26,19 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // q_shared.h -- included first by ALL program modules.
 // A user mod should never modify this file
 
-#define Q3_VERSION            "Q3 1.32e"
+#define Q3_VERSION      "WolfPro-E 1.0"
+// 1.41b-MP: fix autodl sploit
+// 1.4-MP : (== 1.34)
 #ifndef SVN_VERSION
   #define SVN_VERSION Q3_VERSION
 #endif
-#define CLIENT_WINDOW_TITLE   "Quake 3: Arena"
-#define CONSOLE_WINDOW_TITLE  "Quake 3 Console"
-// 1.32 released 7-10-2002
+#define CLIENT_WINDOW_TITLE   "RtcwPro-E"
+#define CONSOLE_WINDOW_TITLE  "RtcwPro-E Console"
+// 1.3-MP : final for release
+// 1.1b - TTimo SP linux release (+ MP updates)
+// 1.1b5 - Mac update merge in
 
-//#define DEFAULT_GAME			"edawn"
-
-#define BASEGAME				"baseq3"
+#define BASEGAME				"main"
 #define BASEDEMO				"demoq3"
 #define BASETA					"missionpack"
 #define STEAMPATH_NAME			"Quake 3 Arena"
@@ -948,8 +950,69 @@ default values.
 #define CVAR_ARCHIVE_ND		(CVAR_ARCHIVE | CVAR_NODEFAULT)
 
 // These flags are only returned by the Cvar_Flags() function
-#define CVAR_MODIFIED		0x40000000	// Cvar was modified
-#define CVAR_NONEXISTENT	0x80000000	// Cvar doesn't exist.
+#define CVAR_MODIFIED		0x400000	// Cvar was modified
+#define CVAR_NONEXISTENT	0x800000	// Cvar doesn't exist.
+
+#define CVAR_WOLFINFO       0x1000000    // DHM - NERVE :: Like userinfo, but for wolf multiplayer info
+
+#define SVC_NONE            0
+#define SVC_EQUAL           1
+#define SVC_NOTEQUAL        2
+#define SVC_GREATER         3
+#define SVC_GREATEREQUAL    4
+#define SVC_LOWER           5
+#define SVC_LOWEREQUAL      6
+#define SVC_INSIDE          7
+#define SVC_OUTSIDE         8
+#define SVC_INCLUDE         9
+#define SVC_EXCLUDE         10
+#define SVC_WITHBITS        11
+#define SVC_WITHOUTBITS     12
+#define SVC_MAX             13
+
+#define SVC_TYPE_STRING     0
+#define SVC_TYPE_INT        1
+#define SVC_TYPE_FLOAT      2
+#define SVC_TYPE_MAX        3
+
+// Cvar restrictions table for tags
+typedef struct {
+	int type;
+	char* operatorFlag;
+	char* longDesc;
+} cvar_restrictions_l;
+
+// Cvar restriction tags
+static const cvar_restrictions_l Cvar_Restriction_Flags[] = {
+	{ SVC_NONE, "", "<any>" },
+	{ SVC_EQUAL, "EQ", "EQUAL" },
+	{ SVC_NOTEQUAL, "!EQ", "NOT EQUAL" },
+	{ SVC_GREATER, "GRT", "GREATER" },
+	{ SVC_GREATEREQUAL, "GQ", "GREATER OR EQUAL" },
+	{ SVC_LOWER, "LO", "LOWER" },
+	{ SVC_LOWEREQUAL, "LQ", "LOWER OR EQUAL" },
+	{ SVC_INSIDE, "IN", "BETWEEN" },
+	{ SVC_OUTSIDE, "OUT", "OUTSIDE" },
+	{ SVC_INCLUDE, "INCLUDE", "INCLUDE" },
+	{ SVC_EXCLUDE, "EXCLUDE", "NOT INCLUDE" },
+	{ SVC_WITHBITS, "WBIT", "WITH BITS" },
+	{ SVC_WITHOUTBITS, "!WBIT", "WITHOUT BITS" }
+};
+
+// Cvar restrictions
+typedef struct cvar_restrictions_s {
+	char* name;
+	unsigned int type;
+	char*   sVal1;
+	char*   sVal2;
+	float   fVal1;
+	float   fVal2;
+	int     iVal1;
+	int     iVal2;
+	struct cvar_restrictions_s* next;
+	struct cvar_restrictions_s* hashNext;
+	qboolean flagged;
+} cvar_rest_t;
 
 typedef enum {
 	CV_NONE = 0,
@@ -1105,6 +1168,7 @@ typedef enum {
 
 ========================================================================
 */
+#define ANIM_BITS       10
 
 #define	ANGLE2SHORT(x)	((int)((x)*65536/360) & 65535)
 #define	SHORT2ANGLE(x)	((x)*(360.0/65536))
@@ -1131,10 +1195,34 @@ typedef enum {
 
 
 #define	MAX_MODELS			256		// these are sent over the net as 8 bits
-#define	MAX_SOUNDS			256		// so they cannot be blindly increased
+#define MAX_SOUNDS          256     // so they cannot be blindly increased
 
 
-#define	MAX_CONFIGSTRINGS	1024
+#define MAX_PARTICLES_AREAS     128
+
+#define MAX_MULTI_SPAWNTARGETS  16 // JPW NERVE
+
+//#define	MAX_CONFIGSTRINGS	1024
+#define MAX_CONFIGSTRINGS   2048
+#define MAX_MAPCONFIGSTRINGS 8192 // RTCWPro
+
+#define NUM_MODELS 2
+#define AXIS_MODEL_HANDLE	0
+#define ALLIED_MODEL_HANDLE 1
+
+#define MAX_DLIGHT_CONFIGSTRINGS    128
+#define MAX_CLIPBOARD_CONFIGSTRINGS 64
+#define MAX_SPLINE_CONFIGSTRINGS    64
+
+#define PARTICLE_SNOW128    1
+#define PARTICLE_SNOW64     2
+#define PARTICLE_SNOW32     3
+#define PARTICLE_SNOW256    0
+
+#define PARTICLE_BUBBLE8    4
+#define PARTICLE_BUBBLE16   5
+#define PARTICLE_BUBBLE32   6
+#define PARTICLE_BUBBLE64   7
 
 // these are the only configstrings that the system reserves, all the
 // other ones are strictly for servergame to clientgame communication
@@ -1150,17 +1238,54 @@ typedef struct {
 	int			dataCount;
 } gameState_t;
 
+#define REF_FORCE_DLIGHT    ( 1 << 31 ) // RF, passed in through overdraw parameter, force this dlight under all conditions
+#define REF_JUNIOR_DLIGHT   ( 1 << 30 ) // (SA) this dlight does not light surfaces.  it only affects dynamic light grid
+
 //=========================================================
+// shared by AI and animation scripting
+//
+typedef enum
+{
+	// TTimo gcc: enums don't go <=0 unless you force a value
+	AISTATE_NULL = -1,
+	AISTATE_RELAXED,
+	AISTATE_QUERY,
+	AISTATE_ALERT,
+	AISTATE_COMBAT,
+
+	MAX_AISTATES
+} aistateEnum_t;
+
+//=========================================================
+
+
+// weapon grouping
+#define MAX_WEAP_BANKS      12
+#define MAX_WEAPS_IN_BANK   3
+// JPW NERVE
+#define MAX_WEAPS_IN_BANK_MP    8
+#define MAX_WEAP_BANKS_MP   7
+// jpw
+#define MAX_WEAP_ALTS       WP_DYNAMITE2
+
 
 // bit field limits
 #define	MAX_STATS				16
 #define	MAX_PERSISTANT			16
 #define	MAX_POWERUPS			16
-#define	MAX_WEAPONS				16		
+#define	MAX_HOLDABLE			16
+#define MAX_AMMO				16
+#define MAX_AMMOCLIP			16
+#define MAX_WEAPONS             64  // (SA) and yet more!
 
-#define	MAX_PS_EVENTS			2
+// Ridah, increased this
+//#define	MAX_PS_EVENTS			2
+// ACK: I'd really like to make this 4, but that seems to cause network problems
+#define MAX_EVENTS              4   // max events per frame before we drop events
+//#define	MAX_EVENTS				2	// max events per frame before we drop events
 
-#define PS_PMOVEFRAMECOUNTBITS	6
+
+#define PS_PMOVEFRAMECOUNTBITS  6
 
 // playerState_t is the information needed by both the client and server
 // to predict player motion and actions
@@ -1181,8 +1306,14 @@ typedef struct playerState_s {
 
 	vec3_t		origin;
 	vec3_t		velocity;
-	int			weaponTime;
+	int weaponTime;
+	int weaponDelay;            // for weapons that don't fire immediately when 'fire' is hit (grenades, venom, ...)
+	int grenadeTimeLeft;            // for delayed grenade throwing.  this is set to a #define for grenade
+									// lifetime when the attack button goes down, then when attack is released
+									// this is the amount of time left before the grenade goes off (or if it
+									// gets to 0 while in players hand, it explodes)
 	int			gravity;
+	float leanf;                // amount of 'lean' when player is looking around corner //----(SA)	added
 	int			speed;
 	int			delta_angles[3];	// add to command angles to get view direction
 									// changed by spawns, rotating objects, and teleporters
@@ -1200,23 +1331,27 @@ typedef struct playerState_s {
 								// when at rest, the value will remain unchanged
 								// used to twist the legs during strafing
 
-	vec3_t		grapplePoint;	// location of grapple to pull towards if PMF_GRAPPLE_PULL
+
 
 	int			eFlags;			// copied to entityState_t->eFlags
 
-	int			eventSequence;	// pmove generated events
-	int			events[MAX_PS_EVENTS];
-	int			eventParms[MAX_PS_EVENTS];
+	int eventSequence;          // pmove generated events
+	int events[MAX_EVENTS];
+	int eventParms[MAX_EVENTS];
+	int oldEventSequence;           // so we can see which events have been added since we last converted to entityState_t
 
-	int			externalEvent;	// events set on player from another source
+	int externalEvent;          // events set on player from another source
 	int			externalEventParm;
 	int			externalEventTime;
 
 	int			clientNum;		// ranges from 0 to MAX_CLIENTS-1
 	int			weapon;			// copied to entityState_t->weapon
-	int			weaponstate;
+	int weaponstate;
 
-	vec3_t		viewangles;		// for fixed views
+	// item info
+	int item;
+
+	vec3_t viewangles;          // for fixed views
 	int			viewheight;
 
 	// damage feedback
@@ -1228,17 +1363,94 @@ typedef struct playerState_s {
 	int			stats[MAX_STATS];
 	int			persistant[MAX_PERSISTANT];	// stats that aren't cleared on death
 	int			powerups[MAX_POWERUPS];	// level.time that the powerup runs out
-	int			ammo[MAX_WEAPONS];
+	int ammo[MAX_WEAPONS];              // total amount of ammo
+	int ammoclip[MAX_WEAPONS];          // ammo in clip
+	int holdable[16];
+	int holding;                        // the current item in holdable[] that is selected (held)
+	int weapons[MAX_WEAPONS / ( sizeof( int ) * 8 )];   // 64 bits for weapons held
+
+	// Ridah, allow for individual bounding boxes
+	vec3_t mins, maxs;
+	float crouchMaxZ;
+	float crouchViewHeight, standViewHeight, deadViewHeight;
+	// variable movement speed
+	float runSpeedScale, sprintSpeedScale, crouchSpeedScale;
+	// done.
 
 	int			generic1;
-	int			loopSound;
-	int			jumppad_ent;	// jumppad entity hit this frame
+	
+	// Ridah, view locking for mg42
+	int viewlocked;
+	int viewlocked_entNum;
 
+	// Ridah, need this to fix friction problems with slow zombie's whereby
+	// the friction prevents them from accelerating to their full potential
+	float friction;
+
+	// Ridah, AI character id is used for weapon association
+	int aiChar;
+	int teamNum;
+
+	// Rafael
+	int gunfx;
+
+	// RF, burning effect is required for view blending effect
+	int onFireStart;
+
+	int serverCursorHint;               // what type of cursor hint the server is dictating
+	int serverCursorHintVal;            // a value (0-255) associated with the above
+
+	trace_t serverCursorHintTrace;      // not communicated over net, but used to store the current server-side cursorhint trace
+
+	// ----------------------------------------------------------------------
 	// not communicated over the net at all
-	int			ping;			// server to game info for scoreboard
-	int			pmove_framecount;	// FIXME: don't transmit over the network
-	int			jumppad_frame;
-	int			entityEventSequence;
+	// FIXME: this doesn't get saved between predicted frames on the clients-side (cg.predictedPlayerState)
+	// So to use persistent variables here, which don't need to come from the server,
+	// we could use a marker variable, and use that to store everything after it
+	// before we read in the new values for the predictedPlayerState, then restore them
+	// after copying the structure recieved from the server.
+
+	// (SA) yeah.  this is causing me a little bit of trouble too.  can we go ahead with the above suggestion or find an alternative?
+
+	int ping;                   // server to game info for scoreboard
+	int pmove_framecount;           // FIXME: don't transmit over the network
+	int entityEventSequence;
+
+	int sprintTime;
+	int sprintExertTime;
+
+	// JPW NERVE -- value for all multiplayer classes with regenerating "class weapons" -- ie LT artillery, medic medpack, engineer build points, etc
+	int classWeaponTime;
+	int jumpTime;         // used in MP to prevent jump accel
+	// jpw
+
+	int weapAnimTimer;              // don't change low priority animations until this runs out		//----(SA)	added
+	int weapAnim;               // mask off ANIM_TOGGLEBIT										//----(SA)	added
+
+	qboolean releasedFire;
+
+	float aimSpreadScaleFloat;          // (SA) the server-side aimspreadscale that lets it track finer changes but still only
+										// transmit the 8bit int to the client
+	int aimSpreadScale;         // 0 - 255 increases with angular movement
+	int lastFireTime;           // used by server to hold last firing frame briefly when randomly releasing trigger (AI)
+
+	int quickGrenTime;
+
+	int leanStopDebounceTime;
+
+//----(SA)	added
+
+	// seems like heat and aimspread could be tied together somehow, however, they (appear to) change at different rates and
+	// I can't currently see how to optimize this to one server->client transmission "weapstatus" value.
+	int weapHeat[MAX_WEAPONS];          // some weapons can overheat.  this tracks (server-side) how hot each weapon currently is.
+	int curWeapHeat;                    // value for the currently selected weapon (for transmission to client)
+
+	int venomTime;          //----(SA)	added
+//----(SA)	end
+
+	aistateEnum_t aiState;
+
+	int identifyClient;                 // NERVE - SMF
 } playerState_t;
 
 
@@ -1258,26 +1470,58 @@ typedef struct playerState_s {
 										// only generate a small move value for that frame
 										// walking will use different animations and
 										// won't generate footsteps
-#define BUTTON_AFFIRMATIVE	32
-#define	BUTTON_NEGATIVE		64
+//----(SA)	added
+#define BUTTON_SPRINT       32
+#define BUTTON_ACTIVATE     64
+//----(SA)	end
 
-#define BUTTON_GETFLAG		128
-#define BUTTON_GUARDBASE	256
-#define BUTTON_PATROL		512
-#define BUTTON_FOLLOWME		1024
+#define BUTTON_ANY          128         // any key whatsoever
 
-#define	BUTTON_ANY			2048			// any key whatsoever
 
-#define	MOVE_RUN			120			// if forwardmove or rightmove are >= MOVE_RUN,
+
+
+//----(SA) wolf buttons
+#define WBUTTON_ATTACK2     1
+#define WBUTTON_ZOOM        2
+#define WBUTTON_QUICKGREN   4
+#define WBUTTON_RELOAD      8
+#define WBUTTON_LEANLEFT    16
+#define WBUTTON_LEANRIGHT   32
+#define WBUTTON_DROP        64 // JPW NERVE
+
+// unused
+#define WBUTTON_EXTRA7      128
+//----(SA) end
+
+#define MOVE_RUN            120         // if forwardmove or rightmove are >= MOVE_RUN,
 										// then BUTTON_WALKING should be set
+
+#define MP_TEAM_OFFSET      6
+#define MP_CLASS_OFFSET     4
+#define MP_WEAPON_OFFSET    0
+
+#define MP_TEAM_BITS        2
+#define MP_CLASS_BITS       2
+#define MP_WEAPON_BITS      4
+
+#define MP_TEAM_MASK        0xC0
+#define MP_CLASS_MASK       0x30
+#define MP_WEAPON_MASK      0x0F
 
 // usercmd_t is sent to the server each client frame
 typedef struct usercmd_s {
-	int				serverTime;
-	int				angles[3];
-	int 			buttons;
-	byte			weapon;           // weapon 
-	signed char	forwardmove, rightmove, upmove;
+	int serverTime;
+	byte buttons;
+	byte wbuttons;
+	byte weapon;
+	byte holdable;          //----(SA)	added
+	int angles[3];
+
+	signed char forwardmove, rightmove, upmove;
+	signed char wolfkick;       // RF, we should move this over to a wbutton, this is a huge waste of bandwidth
+
+	char mpSetup;               // NERVE - SMF
+	char identClient;           // NERVE - SMF
 } usercmd_t;
 
 //===================================================================
@@ -1287,11 +1531,18 @@ typedef struct usercmd_s {
 
 typedef enum {
 	TR_STATIONARY,
-	TR_INTERPOLATE,				// non-parametric, but interpolate between snapshots
+	TR_INTERPOLATE,             // non-parametric, but interpolate between snapshots
 	TR_LINEAR,
 	TR_LINEAR_STOP,
-	TR_SINE,					// value = base + sin( time / duration ) * delta
-	TR_GRAVITY
+	TR_LINEAR_STOP_BACK,        //----(SA)	added.  so reverse movement can be different than forward
+	TR_SINE,                    // value = base + sin( time / duration ) * delta
+	TR_GRAVITY,
+	// Ridah
+	TR_GRAVITY_LOW,
+	TR_GRAVITY_FLOAT,           // super low grav with no gravity acceleration (floating feathers/fabric/leaves/...)
+	TR_GRAVITY_PAUSED,          //----(SA)	has stopped, but will still do a short trace to see if it should be switched back to TR_GRAVITY
+	TR_ACCELERATE,
+	TR_DECCELERATE
 } trType_t;
 
 typedef struct {
@@ -1301,6 +1552,10 @@ typedef struct {
 	vec3_t	trBase;
 	vec3_t	trDelta;			// velocity, etc
 } trajectory_t;
+
+// RF, put this here so we have a central means of defining a Zombie (kind of a hack, but this is to minimize bandwidth usage)
+#define SET_FLAMING_ZOMBIE( x,y ) ( x.frame = y )
+#define IS_FLAMING_ZOMBIE( x )    ( x.frame == 1 )
 
 // entityState_t is the information conveyed from the server
 // in an update message about entities that the client will
@@ -1332,6 +1587,7 @@ typedef struct entityState_s {
 	int		groundEntityNum;	// ENTITYNUM_NONE = in air
 
 	int		constantLight;	// r + (g<<8) + (b<<16) + (intensity<<24)
+	int dl_intensity;       // used for coronas
 	int		loopSound;		// constantly loop this sound
 
 	int		modelindex;
@@ -1342,15 +1598,37 @@ typedef struct entityState_s {
 	int		solid;			// for client side prediction, trap_linkentity sets this properly
 
 	int		event;			// impulse events -- muzzle flashes, footsteps, etc
-	int		eventParm;
+	int eventParm;
+
+	int eventSequence;      // pmove generated events
+	int events[MAX_EVENTS];
+	int eventParms[MAX_EVENTS];
 
 	// for players
 	int		powerups;		// bit flags
 	int		weapon;			// determines weapon and flash model, etc
 	int		legsAnim;		// mask off ANIM_TOGGLEBIT
 	int		torsoAnim;		// mask off ANIM_TOGGLEBIT
+//	int		weapAnim;		// mask off ANIM_TOGGLEBIT	//----(SA)	removed (weap anims will be client-side only)
 
 	int		generic1;
+	
+	int density;            // for particle effects
+
+	int dmgFlags;           // to pass along additional information for damage effects for players/ Also used for cursorhints for non-player entities
+
+	// Ridah
+	int onFireStart, onFireEnd;
+
+	int aiChar, teamNum;
+
+	int effect1Time, effect2Time, effect3Time;
+
+	aistateEnum_t aiState;
+
+	int animMovetype;       // clients can't derive movetype of other clients for anim scripting system
+
+
 } entityState_t;
 
 typedef enum {
@@ -1417,9 +1695,9 @@ typedef struct qtime_s {
 // server browser sources
 // TTimo: AS_MPLAYER is no longer used
 #define AS_LOCAL			0
-#define AS_MPLAYER		1
-#define AS_GLOBAL			2
-#define AS_FAVORITES	3
+#define AS_GLOBAL       1           // NERVE - SMF - modified
+#define AS_FAVORITES    2
+#define AS_MPLAYER      3
 
 
 // cinematic states
@@ -1459,4 +1737,37 @@ typedef enum _flag_status {
 #define LERP( a, b, w ) ( ( a ) * ( 1.0f - ( w ) ) + ( b ) * ( w ) )
 #define LUMA( red, green, blue ) ( 0.2126f * ( red ) + 0.7152f * ( green ) + 0.0722f * ( blue ) )
 
-#endif	// __Q_SHARED_H
+// NERVE - SMF - localization
+typedef enum {
+#ifndef __MACOS__   //DAJ USA
+	LANGUAGE_FRENCH = 0,
+	LANGUAGE_GERMAN,
+	LANGUAGE_ITALIAN,
+	LANGUAGE_SPANISH,
+#endif
+	MAX_LANGUAGES
+} languages_t;
+
+// NERVE - SMF - wolf server/game states
+typedef enum {
+	GS_INITIALIZE = -1,
+	GS_PLAYING,
+	GS_WARMUP_COUNTDOWN,
+	GS_WARMUP,
+	GS_INTERMISSION,
+	GS_WAITING_FOR_PLAYERS,
+	GS_RESET
+} gamestate_t;
+
+// TTimo - voting config flags
+#define VOTEFLAGS_RESTART           ( 1 << 0 )
+#define VOTEFLAGS_RESETMATCH    ( 1 << 1 )
+#define VOTEFLAGS_STARTMATCH    ( 1 << 2 )
+#define VOTEFLAGS_NEXTMAP           ( 1 << 3 )
+#define VOTEFLAGS_SWAP              ( 1 << 4 )
+#define VOTEFLAGS_TYPE              ( 1 << 5 )
+#define VOTEFLAGS_KICK              ( 1 << 6 )
+#define VOTEFLAGS_MAP                   ( 1 << 7 )
+
+#endif  // __Q_SHARED_H
+

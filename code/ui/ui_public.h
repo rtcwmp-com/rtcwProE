@@ -1,27 +1,33 @@
 /*
 ===========================================================================
-Copyright (C) 1999-2005 Id Software, Inc.
 
-This file is part of Quake III Arena source code.
+Return to Castle Wolfenstein multiplayer GPL Source Code
+Copyright (C) 1999-2010 id Software LLC, a ZeniMax Media company. 
 
-Quake III Arena source code is free software; you can redistribute it
-and/or modify it under the terms of the GNU General Public License as
-published by the Free Software Foundation; either version 2 of the License,
-or (at your option) any later version.
+This file is part of the Return to Castle Wolfenstein multiplayer GPL Source Code (?RTCW MP Source Code?).  
 
-Quake III Arena source code is distributed in the hope that it will be
-useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
+RTCW MP Source Code is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+RTCW MP Source Code is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
-along with Quake III Arena source code; if not, write to the Free Software
-Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
+along with RTCW MP Source Code.  If not, see <http://www.gnu.org/licenses/>.
+
+In addition, the RTCW MP Source Code is also subject to certain additional terms. You should have received a copy of these additional terms immediately following the terms and conditions of the GNU General Public License which accompanied the RTCW MP Source Code.  If not, please request a copy in writing from id Software at the address below.
+
+If you have questions concerning this license or the applicable additional terms, you may contact in writing id Software LLC, c/o ZeniMax Media Inc., Suite 120, Rockville, Maryland 20850 USA.
+
 ===========================================================================
 */
 //
-#ifndef __UI_PUBLIC_H__
-#define __UI_PUBLIC_H__
+#ifndef _UI_PUBLIC_H_
+#define _UI_PUBLIC_H_
 
 #define UI_API_VERSION	6
 
@@ -121,13 +127,24 @@ typedef enum {
 	UI_LAN_GETSERVERPING,
 	UI_LAN_SERVERISVISIBLE,
 	UI_LAN_COMPARESERVERS,
-	// 1.32
-	UI_FS_SEEK,
-	UI_SET_PBCLSTATUS,
+	UI_CL_GETLIMBOSTRING,           // NERVE - SMF
+	UI_SET_PBCLSTATUS,              // DHM - Nerve
+	UI_CHECKAUTOUPDATE,             // DHM - Nerve
+	UI_GET_AUTOUPDATE,              // DHM - Nerve
+	UI_CL_TRANSLATE_STRING,
+	UI_OPENURL,
+	UI_SET_PBSVSTATUS,              // TTimo
 
+	UI_MEMSET = 100,
+	UI_MEMCPY,
+	UI_STRNCPY,
+	UI_SIN,
+	UI_COS,
+	UI_ATAN2,
+	UI_SQRT,
 	UI_FLOOR = 107,
 	UI_CEIL,
-
+	UI_FS_SEEK,
 	// engine extensions
 	UI_R_ADDREFENTITYTOSCENE2,
 	UI_R_ADDLINEARLIGHTTOSCENE,
@@ -142,7 +159,19 @@ typedef enum {
 	UIMENU_NEED_CD,
 	UIMENU_BAD_CD_KEY,
 	UIMENU_TEAM,
-	UIMENU_POSTGAME
+	UIMENU_POSTGAME,
+	UIMENU_NOTEBOOK,
+	UIMENU_CLIPBOARD,
+	UIMENU_HELP,
+	UIMENU_BOOK1,           //----(SA)	added
+	UIMENU_BOOK2,           //----(SA)	added
+	UIMENU_BOOK3,           //----(SA)	added
+	UIMENU_WM_PICKTEAM,         // NERVE - SMF
+	UIMENU_WM_PICKPLAYER,       // NERVE - SMF
+	UIMENU_WM_QUICKMESSAGE,     // NERVE - SMF
+	UIMENU_WM_QUICKMESSAGEALT,  // NERVE - SMF
+	UIMENU_WM_LIMBO,            // NERVE - SMF
+	UIMENU_WM_AUTOUPDATE        // NERVE - DHM
 } uiMenuCommand_t;
 
 #define SORT_HOST			0
@@ -175,6 +204,9 @@ typedef enum {
 
 	UI_SET_ACTIVE_MENU,
 //	void	UI_SetActiveMenu( uiMenuCommand_t menu );
+
+	UI_GET_ACTIVE_MENU,
+//	void	UI_GetActiveMenu( void );
 
 	UI_CONSOLE_COMMAND,
 //	qboolean UI_ConsoleCommand( int realTime );

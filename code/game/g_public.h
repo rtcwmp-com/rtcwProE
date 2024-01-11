@@ -1,22 +1,28 @@
 /*
 ===========================================================================
-Copyright (C) 1999-2005 Id Software, Inc.
 
-This file is part of Quake III Arena source code.
+Return to Castle Wolfenstein multiplayer GPL Source Code
+Copyright (C) 1999-2010 id Software LLC, a ZeniMax Media company. 
 
-Quake III Arena source code is free software; you can redistribute it
-and/or modify it under the terms of the GNU General Public License as
-published by the Free Software Foundation; either version 2 of the License,
-or (at your option) any later version.
+This file is part of the Return to Castle Wolfenstein multiplayer GPL Source Code (?RTCW MP Source Code?).  
 
-Quake III Arena source code is distributed in the hope that it will be
-useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
+RTCW MP Source Code is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+RTCW MP Source Code is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
-along with Quake III Arena source code; if not, write to the Free Software
-Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
+along with RTCW MP Source Code.  If not, see <http://www.gnu.org/licenses/>.
+
+In addition, the RTCW MP Source Code is also subject to certain additional terms. You should have received a copy of these additional terms immediately following the terms and conditions of the GNU General Public License which accompanied the RTCW MP Source Code.  If not, please request a copy in writing from id Software at the address below.
+
+If you have questions concerning this license or the applicable additional terms, you may contact in writing id Software LLC, c/o ZeniMax Media Inc., Suite 120, Rockville, Maryland 20850 USA.
+
 ===========================================================================
 */
 //
@@ -85,7 +91,10 @@ typedef struct {
 	// ent->s.number == passEntityNum	(don't interact with self)
 	// ent->s.ownerNum = passEntityNum	(don't interact with your own missiles)
 	// entity[ent->s.ownerNum].ownerNum = passEntityNum	(don't interact with other missiles from owner)
-	int			ownerNum;
+	int ownerNum;
+	int eventTime;
+
+	int worldflags;             // DHM - Nerve
 } entityShared_t;
 
 
@@ -133,6 +142,7 @@ typedef enum {
 	G_FS_FOPEN_FILE,	// ( const char *qpath, fileHandle_t *file, fsMode_t mode );
 	G_FS_READ,		// ( void *buffer, int len, fileHandle_t f );
 	G_FS_WRITE,		// ( const void *buffer, int len, fileHandle_t f );
+	G_FS_RENAME,
 	G_FS_FCLOSE_FILE,		// ( fileHandle_t f );
 
 	G_SEND_CONSOLE_COMMAND,	// ( const char *text );
@@ -226,9 +236,10 @@ typedef enum {
 	G_TRACECAPSULE,	// ( trace_t *results, const vec3_t start, const vec3_t mins, const vec3_t maxs, const vec3_t end, int passEntityNum, int contentmask );
 	G_ENTITY_CONTACTCAPSULE,	// ( const vec3_t mins, const vec3_t maxs, const gentity_t *ent );
 
-	// 1.32
+// done.
 	G_FS_SEEK,
 
+	G_GETTAG,
 	G_MATRIXMULTIPLY = 107,
 	G_ANGLEVECTORS,
 	G_PERPENDICULARVECTOR,
@@ -237,7 +248,7 @@ typedef enum {
 	G_TESTPRINTINT,
 	G_TESTPRINTFLOAT,
 
-	BOTLIB_SETUP = 200,				// ( void );
+	BOTLIB_SETUP = 200,             // ( void );
 	BOTLIB_SHUTDOWN,				// ( void );
 	BOTLIB_LIBVAR_SET,
 	BOTLIB_LIBVAR_GET,
@@ -260,6 +271,10 @@ typedef enum {
 	BOTLIB_AAS_PRESENCE_TYPE_BOUNDING_BOX,
 	BOTLIB_AAS_TIME,
 
+	// Ridah
+	BOTLIB_AAS_SETCURRENTWORLD,
+	// done.
+
 	BOTLIB_AAS_POINT_AREA_NUM,
 	BOTLIB_AAS_TRACE_AREAS,
 
@@ -277,14 +292,26 @@ typedef enum {
 	BOTLIB_AAS_SWIMMING,
 	BOTLIB_AAS_PREDICT_CLIENT_MOVEMENT,
 
+	// Ridah, route-tables
+	BOTLIB_AAS_RT_SHOWROUTE,
+	BOTLIB_AAS_RT_GETHIDEPOS,
+	BOTLIB_AAS_FINDATTACKSPOTWITHINRANGE,
+	BOTLIB_AAS_SETAASBLOCKINGENTITY,
+	// done.
+
 	BOTLIB_EA_SAY = 400,
 	BOTLIB_EA_SAY_TEAM,
+	BOTLIB_EA_USE_ITEM,
+	BOTLIB_EA_DROP_ITEM,
+	BOTLIB_EA_USE_INV,
+	BOTLIB_EA_DROP_INV,
 	BOTLIB_EA_COMMAND,
 
 	BOTLIB_EA_ACTION,
 	BOTLIB_EA_GESTURE,
 	BOTLIB_EA_TALK,
 	BOTLIB_EA_ATTACK,
+	BOTLIB_EA_RELOAD,
 	BOTLIB_EA_USE,
 	BOTLIB_EA_RESPAWN,
 	BOTLIB_EA_CROUCH,
@@ -294,7 +321,6 @@ typedef enum {
 	BOTLIB_EA_MOVE_BACK,
 	BOTLIB_EA_MOVE_LEFT,
 	BOTLIB_EA_MOVE_RIGHT,
-
 	BOTLIB_EA_SELECT_WEAPON,
 	BOTLIB_EA_JUMP,
 	BOTLIB_EA_DELAYED_JUMP,
@@ -367,6 +393,9 @@ typedef enum {
 	BOTLIB_AI_ALLOC_MOVE_STATE,
 	BOTLIB_AI_FREE_MOVE_STATE,
 	BOTLIB_AI_INIT_MOVE_STATE,
+	// Ridah
+	BOTLIB_AI_INIT_AVOID_REACH,
+	// done.
 
 	BOTLIB_AI_CHOOSE_BEST_FIGHT_WEAPON,
 	BOTLIB_AI_GET_WEAPON_INFO,
@@ -435,8 +464,16 @@ typedef enum {
 	// The game can issue trap_argc() / trap_argv() commands to get the command
 	// and parameters.  Return qfalse if the game doesn't recognize it as a command.
 
-	BOTAI_START_FRAME,				// ( int time );
+	BOTAI_START_FRAME				// ( int time );
 
-	GAME_EXPORT_LAST
+	,GAME_EXPORT_LAST
+	
+	// Ridah, Cast AI
+	,AICAST_VISIBLEFROMPOS
+	,AICAST_CHECKATTACKATPOS
+	// done.
+
+	,GAME_RETRIEVE_MOVESPEEDS_FROM_CLIENT
+
 } gameExport_t;
 

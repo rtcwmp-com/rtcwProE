@@ -66,6 +66,7 @@ typedef struct {
 	int		maxsize;
 	int		maxbits;			// maxsize in bits, for overflow checks
 	int		cursize;
+	int uncompsize;             // NERVE - SMF - net debugging
 	int		readcount;
 	int		bit;				// for bitwise reads and writes
 } msg_t;
@@ -73,6 +74,7 @@ typedef struct {
 void MSG_Init( msg_t *buf, byte *data, int length );
 void MSG_InitOOB( msg_t *buf, byte *data, int length );
 void MSG_Clear( msg_t *buf );
+void *MSG_GetSpace( msg_t *buf, int length );
 void MSG_WriteData( msg_t *buf, const void *data, int length );
 void MSG_Bitstream( msg_t *buf );
 
@@ -101,6 +103,7 @@ int MSG_HashKey(const char *string, int maxlen);
 void	MSG_BeginReading (msg_t *sb);
 void	MSG_BeginReadingOOB(msg_t *sb);
 
+int     MSG_ReadBits( msg_t *msg, int bits );
 int		MSG_ReadChar (msg_t *sb);
 int		MSG_ReadByte (msg_t *sb);
 int		MSG_ReadShort (msg_t *sb);
@@ -113,6 +116,8 @@ float MSG_ReadAngle16 (msg_t *sb);
 void  MSG_ReadData(msg_t *sb, void *buffer, int size);
 int   MSG_ReadEntitynum(msg_t *sb);
 
+void MSG_WriteDeltaUsercmd( msg_t *msg, struct usercmd_s *from, struct usercmd_s *to );
+void MSG_ReadDeltaUsercmd( msg_t *msg, struct usercmd_s *from, struct usercmd_s *to );
 void MSG_WriteDeltaUsercmdKey( msg_t *msg, int key, const usercmd_t *from, const usercmd_t *to );
 void MSG_ReadDeltaUsercmdKey( msg_t *msg, int key, const usercmd_t *from, usercmd_t *to );
 
@@ -153,8 +158,8 @@ NET
 
 #define	PORT_ANY			-1
 
-#define	MAX_RELIABLE_COMMANDS	64			// max string commands buffered for restransmit
-
+#define MAX_RELIABLE_COMMANDS   256 // bigger!
+#define NET_ENABLEV4            0x01
 typedef enum {
 	NA_BAD = 0,					// an address lookup failed
 	NA_BOT,
@@ -191,8 +196,11 @@ typedef struct {
 #endif
 } netadr_t;
 
+void		NET_Restart(void);
 void		NET_Init( void );
 void		NET_Shutdown( void );
+void		NET_Restart_f( void );
+void        NET_Config( qboolean enableNetworking );
 void		NET_FlushPacketQueue(void);
 void		NET_SendPacket( netsrc_t sock, int length, const void *data, const netadr_t *to );
 void		QDECL NET_OutOfBandPrint( netsrc_t net_socket, const netadr_t *adr, const char *format, ...) __attribute__ ((format (printf, 3, 4)));
@@ -214,7 +222,7 @@ qboolean	NET_Sleep( int timeout );
 
 #define	MAX_PACKETLEN	1400	// max size of a network packet
 
-#define	MAX_MSGLEN		16384	// max length of a message, which may
+#define MAX_MSGLEN              32768       // max length of a message, which may
 								// be fragmented into multiple packets
 
 #define	MAX_MSGLEN_BUF	(MAX_MSGLEN+8)	// real buffer size that we need to allocate
@@ -280,25 +288,46 @@ PROTOCOL
 ==============================================================
 */
 
-#define	OLD_PROTOCOL_VERSION	68
-// new protocol with UDP spoofing protection:
-#define	NEW_PROTOCOL_VERSION	71
-// 1.31 - 67
+// sent by the server, printed on connection screen, works for all clients
+// (restrictions: does not handle \n, no more than 256 chars)
+#define PROTOCOL_MISMATCH_ERROR "ERROR: Protocol Mismatch Between Client and Server.\
+The server you are attempting to join is running an incompatible version of the game."
 
-#define DEFAULT_PROTOCOL_VERSION	OLD_PROTOCOL_VERSION
+// long version used by the client in diagnostic window
+#define PROTOCOL_MISMATCH_ERROR_LONG "ERROR: Protocol Mismatch Between Client and Server.\n\n\
+The server you attempted to join is running an incompatible version of the game.\n\
+You or the server may be running older versions of the game. Press the auto-update\
+ button if it appears on the Main Menu screen."
 
+// 1.33 - protocol 59
+// 1.4 - protocol 60
+#define GAME_PROTOCOL_VERSION 60
+#define DEFAULT_PROTOCOL_VERSION	GAME_PROTOCOL_VERSION
+#define	OLD_PROTOCOL_VERSION	59
+#define	NEW_PROTOCOL_VERSION	60
 
-// maintain a list of compatible protocols for demo playing
-// NOTE: that stuff only works with two digits protocols
-extern const int demo_protocols[];
+#define GAMENAME_STRING	"wolfmp"
+#define CODENAME		"BlazkowiczIsBack" // L0 - Do not modify this without knowing what the point of it is.
 
-#define	UPDATE_SERVER_NAME	"update.quake3arena.com"
-// override on command line, config files etc.
-#ifndef MASTER_SERVER_NAME
-#define MASTER_SERVER_NAME	"master.quake3arena.com"
-#endif
-#ifndef AUTHORIZE_SERVER_NAME
-#define	AUTHORIZE_SERVER_NAME	"authorize.quake3arena.com"
+// NERVE - SMF - wolf multiplayer master servers
+#define UPDATE_SERVER_NAME      "wolfmotd.idsoftware.com"            // 192.246.40.65
+#define MASTER_SERVER_NAME      "wolfmaster.idsoftware.com"
+#define AUTHORIZE_SERVER_NAME   "wolfauthorize.idsoftware.com"
+
+// TTimo: allow override for easy dev/testing..
+// see cons -- update_server=myhost
+#if !defined( AUTOUPDATE_SERVER_NAME )
+#define AUTOUPDATE_SERVER1_NAME   "au2rtcw1.activision.com"            // DHM - Nerve
+#define AUTOUPDATE_SERVER2_NAME   "au2rtcw2.activision.com"            // DHM - Nerve
+#define AUTOUPDATE_SERVER3_NAME   "au2rtcw3.activision.com"            // DHM - Nerve
+#define AUTOUPDATE_SERVER4_NAME   "au2rtcw4.activision.com"            // DHM - Nerve
+#define AUTOUPDATE_SERVER5_NAME   "au2rtcw5.activision.com"            // DHM - Nerve
+#else
+#define AUTOUPDATE_SERVER1_NAME   AUTOUPDATE_SERVER_NAME
+#define AUTOUPDATE_SERVER2_NAME   AUTOUPDATE_SERVER_NAME
+#define AUTOUPDATE_SERVER3_NAME   AUTOUPDATE_SERVER_NAME
+#define AUTOUPDATE_SERVER4_NAME   AUTOUPDATE_SERVER_NAME
+#define AUTOUPDATE_SERVER5_NAME   AUTOUPDATE_SERVER_NAME
 #endif
 
 #define	PORT_MASTER			27950
@@ -311,6 +340,7 @@ extern const int demo_protocols[];
 									// PORT_SERVER so a single machine can
 									// run multiple servers
 
+#define CDKEY_SALT			"]=q.0xFF^"
 
 // the svc_strings[] array in cl_parse.c should mirror this
 //
@@ -372,6 +402,14 @@ typedef enum {
 	TRAP_COS,
 	TRAP_ATAN2,
 	TRAP_SQRT,
+	TRAP_MATRIXMULTIPLY,
+	TRAP_ANGLEVECTORS,
+	TRAP_PERPENDICULARVECTOR,
+	TRAP_FLOOR,
+	TRAP_CEIL,
+
+	TRAP_TESTPRINTINT,
+	TRAP_TESTPRINTFLOAT
 } sharedTraps_t;
 
 typedef enum {
@@ -516,6 +554,7 @@ void	Cmd_Args_Sanitize( const char *separators );
 // if arg > argc, so string operations are always safe.
 
 void	Cmd_TokenizeString( const char *text );
+void	Cmd_TokenizeLine(const char* text_in, const char* delim, char* pos);
 void	Cmd_TokenizeStringIgnoreQuotes( const char *text_in );
 // Takes a null terminated string.  Does not need to be /n terminated.
 // breaks the string up into arg tokens.
@@ -564,7 +603,16 @@ void	Cvar_Register( vmCvar_t *vmCvar, const char *varName, const char *defaultVa
 void	Cvar_Update( vmCvar_t *vmCvar, int privateFlag );
 // updates an interpreted modules' version of a cvar
 
-void 	Cvar_Set( const char *var_name, const char *value );
+cvar_rest_t* Cvar_SetRestricted(const char* var_name, unsigned int type, const char* value, const char* value2);
+// registers cvars for validation list
+
+char* Cvar_GetRestrictedList(void);
+// returns list of restricted cvars
+
+void Cvar_Rest_Reset(void);
+// Wipes the restricted list
+
+void Cvar_Set( const char *var_name, const char *value );
 // will create the variable with no flags if it doesn't exist
 
 cvar_t	*Cvar_Set2(const char *var_name, const char *value, qboolean force);
@@ -577,6 +625,26 @@ void	Cvar_SetLatched( const char *var_name, const char *value);
 // don't set the cvar immediately
 
 void	Cvar_SetValue( const char *var_name, float value );
+// expands value to a string and calls Cvar_Set
+
+cvar_t* Cvar_FindVar(const char* var_name);
+// find cvar in a local table
+
+cvar_rest_t* Cvar_Rest_FindVar(const char* var_name);
+// find restricted cvar in a local table
+
+qboolean Cvar_RestValueIsValid(cvar_rest_t* var, const char* value);
+// checks if value is valid
+
+void Cvar_RestBuildList(char* data);
+// Builds the list
+
+int Cvar_ValidateRest(void);
+// checks if any cvar is violating server restrictions
+
+char* Cvar_RestAcceptedValues(const char* var_name);
+// returns requires values for specific cvar
+
 void	Cvar_SetIntegerValue( const char *var_name, int value );
 void	Cvar_SetValueSafe( const char *var_name, float value );
 // expands value to a string and calls Cvar_Set/Cvar_SetSafe
