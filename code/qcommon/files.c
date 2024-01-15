@@ -4122,8 +4122,21 @@ static void FS_AddGameDirectory( const char *path, const char *dir ) {
 	// Get .pk3 files
 	pakfiles = Sys_ListFiles(curpath, ".pk3", NULL, &numfiles, qfalse);
 
+	int i;
+	for (i = 0; i < numfiles; i++) {
+		if (!Q_strncmp(pakfiles[i], "mp_", 3)) {
+			memcpy(pakfiles[i], "zz", 2);
+		}
+	}
+
 	if ( numfiles >= 2 )
 		FS_SortFileList( pakfiles, numfiles - 1 );
+
+	for (i = 0; i < numfiles; i++) {
+		if (!Q_strncmp(pakfiles[i], "zz_", 3)) {
+			memcpy(pakfiles[i], "mp", 2);
+		}
+	}
 
 	pakfilesi = 0;
 	pakdirsi = 0;
@@ -4241,12 +4254,24 @@ qboolean FS_idPak(const char *pak, const char *base, int numPaks)
 {
 	int i;
 
+	if (!FS_FilenameCompare(pak, va("%s/mp_bin", base))) {
+		return qtrue;
+	}
+
 	for (i = 0; i < NUM_ID_PAKS; i++) {
-		if ( !FS_FilenameCompare(pak, va("%s/pak%d", base, i)) ) {
+		if (!FS_FilenameCompare(pak, va("%s/pak%d", base, i))) {
 			break;
 		}
+		// JPW NERVE -- this fn prevents external sources from downloading/overwriting official files, so exclude both SP and MP files from this list as well
+		if (!FS_FilenameCompare(pak, va("%s/mp_pak%d", base, i))) {
+			break;
+		}
+		if (!FS_FilenameCompare(pak, va("%s/sp_pak%d", base, i))) {
+			break;
+		}
+		// jpw
 	}
-	if (i < numPaks) {
+	if (i < NUM_ID_PAKS) {
 		return qtrue;
 	}
 	return qfalse;
